@@ -39,6 +39,9 @@ class meminfo_plugin : public scorep::plugin::base<meminfo_plugin,
 public:
     meminfo_plugin()
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG][CALL] meminfo_plugin " << std::endl;
+#endif
         auto interval_str =
             scorep::environment_variable::get("INTERVAL", "10ms");
 
@@ -74,6 +77,9 @@ public:
 
     std::vector<scorep::plugin::metric_property> get_metric_properties(const std::string& pattern /* = "mem.*"*/)
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG][CALL] get_metric_properties " << std::endl;
+#endif
         std::vector<scorep::plugin::metric_property> result;
 
         for (const auto& match : init({pattern})) {
@@ -92,6 +98,9 @@ public:
 
     void add_metric(const meminfo_t& id_obj)
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG][CALL] add_metric " << std::endl;
+#endif
         if (id_obj.name == "MemTotal") {
             mem_total_pos = id_obj.line_nr;
         }
@@ -131,6 +140,17 @@ public:
 
     void start()
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG] mem_total_pos: " << mem_total_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] mem_free_pos: " << mem_free_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] buffers_pos: " << buffers_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] cached_pos: " << cached_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] swap_total_pos: " << swap_total_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] swap_cached_pos: " << swap_cached_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] mem_used_pos: " << mem_used_pos << std::endl;
+        std::cout << "[MEMINFO][DEBUG] swap_used_pos: " << swap_used_pos << std::endl;
+#endif
+
         if (running) {
             return;
         }
@@ -199,6 +219,10 @@ private:
 
     std::vector<meminfo_t> init(const std::vector<std::string>& search)
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG][CALL] init " << std::endl;
+#endif
+
         std::string line;
         std::ifstream meminfo("/proc/meminfo");
         std::vector<meminfo_t> results;
@@ -225,15 +249,12 @@ private:
         regex_custom_str = regex_str;
         regex_str += ":[^a-zA-Z0-9]*([0-9]+).?([kKmMgGtT][bB])?[^a-zA-Z0-9]*";
 
-        std::regex regex(regex_str);
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG] regex_custom_str: " << regex_custom_str << std::endl;
+        std::cout << "[MEMINFO][DEBUG] regex_str: " << regex_str << std::endl;
+#endif
 
-        int mem_total;
-        int mem_free;
-        int buffers;
-        int cached;
-        int swap_total;
-        int swap_free;
-        int swap_cached;
+        std::regex regex(regex_str);
 
         std::int64_t line_nr = 0;
         while (std::getline(meminfo, line)) {
@@ -282,16 +303,20 @@ private:
 
     void parse(std::map<std::int64_t, std::vector<std::int64_t>>& data)
     {
+#ifdef DEBUG
+        std::cout << "[MEMINFO][DEBUG][CALL] parse " << std::endl;
+#endif
+
         std::string line;
         std::ifstream meminfo("/proc/meminfo");
 
-        int mem_total;
-        int mem_free;
-        int buffers;
-        int cached;
-        int swap_total;
-        int swap_free;
-        int swap_cached;
+        std::int64_t mem_total = -1;
+        std::int64_t mem_free = -1;
+        std::int64_t buffers = -1;
+        std::int64_t cached = -1;
+        std::int64_t swap_total = -1;
+        std::int64_t swap_free = -1;
+        std::int64_t swap_cached = -1;
 
         std::int64_t line_nr = 0;
 
@@ -323,24 +348,45 @@ private:
                 }
 
                 if (mem_total_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] mem_total: " << value << std::endl;
+#endif
                     mem_total = value;
                 }
                 if (mem_free_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] mem_free: " << value << std::endl;
+#endif
                     mem_free = value;
                 }
                 if (buffers_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] buffers: " << value << std::endl;
+#endif
                     buffers = value;
                 }
                 if (cached_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] cached: " << value << std::endl;
+#endif
                     cached = value;
                 }
                 if (swap_total_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] swap_total: " << value << std::endl;
+#endif
                     swap_total = value;
                 }
                 if (swap_free_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] swap_free: " << value << std::endl;
+#endif
                     swap_free = value;
                 }
                 if (swap_cached_pos == line_nr) {
+#ifdef DEBUG
+                    std::cout << "[MEMINFO][DEBUG] swap_cached: " << value << std::endl;
+#endif
                     swap_cached = value;
                 }
 
@@ -352,7 +398,16 @@ private:
         // MemUsed
 
         if (auto it = data.find(mem_used_pos); it != data.end()) {
-            it->second.push_back(mem_total - mem_free - buffers - cached);
+            if (mem_total >= 0 && mem_free >= 0 && buffers >= 0 && cached >= 0)
+                it->second.push_back(mem_total - mem_free - buffers - cached);
+            else {
+#ifdef DEBUG
+                std::cout << "[MEMINFO][DEBUG] mem_total: " << mem_total
+                          << " | mem_free: " << mem_free << " | buffers: " << buffers
+                          << " | cached: " << cached << std::endl;
+#endif
+                it->second.push_back(0);
+            }
         }
 
         ++line_nr;
@@ -360,7 +415,16 @@ private:
         // SwapUsed
 
         if (auto it = data.find(swap_used_pos); it != data.end()) {
-            it->second.push_back(swap_total - swap_free - swap_cached);
+            if (swap_total >= 0 && swap_free >= 0 && swap_cached >= 0)
+                it->second.push_back(swap_total - swap_free - swap_cached);
+            else {
+#ifdef DEBUG
+                std::cout << "[MEMINFO][DEBUG] swap_total: " << swap_total
+                          << " | swap_free: " << swap_free
+                          << " | swap_cached: " << swap_cached << std::endl;
+#endif
+                it->second.push_back(0);
+            }
         }
     }
 };
